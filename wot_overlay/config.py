@@ -4,15 +4,32 @@ Everything the user is expected to tweak lives here. No JSON / YAML on purpose:
 for a single-file prototype a plain constants module is the simplest thing that
 works and is still trivial to change.
 """
+import sys
 from pathlib import Path
 
 # ----------------------------------------------------------------------------
 # Paths
 # ----------------------------------------------------------------------------
 
-# Folder that is scanned for PNG overlays at startup.
-# Defaults to `<project root>/overlays`.
-OVERLAYS_DIR: Path = Path(__file__).resolve().parent.parent / "overlays"
+# Base directory used to locate the `overlays` folder.
+#
+# - When running from source  -> project root (repo checkout)
+# - When running as a frozen PyInstaller build -> folder that contains the
+#   `wot-overlay.exe` file, so the expected layout for end users is:
+#
+#       wot-overlay\
+#           wot-overlay.exe
+#           overlays\
+#               paris_1.png
+#               ...
+#
+# This keeps the runtime layout identical for every user.
+if getattr(sys, "frozen", False):
+    _BASE_DIR: Path = Path(sys.executable).resolve().parent
+else:
+    _BASE_DIR = Path(__file__).resolve().parent.parent
+
+OVERLAYS_DIR: Path = _BASE_DIR / "overlays"
 
 
 # ----------------------------------------------------------------------------
