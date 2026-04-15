@@ -60,6 +60,7 @@ class PickerWindow(QWidget):
 
     def show_picker(
         self,
+        modifier: str,
         letter: str,
         entries: List[OverlayEntry],
         selected_index: int,
@@ -69,7 +70,7 @@ class PickerWindow(QWidget):
             self.hide()
             return
 
-        header = f"<b>Alt + {escape(letter.upper())}</b>"
+        header = f"<b>{escape(modifier.upper())} + {escape(letter.upper())}</b>"
         rows: List[str] = [header, ""]
         for i, entry in enumerate(entries):
             label = escape(entry.label)

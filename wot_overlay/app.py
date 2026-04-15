@@ -6,13 +6,15 @@ orchestration logic — everything else is a small, self-contained component.
 
 Selection flow
 --------------
-1. User holds Alt and taps a letter key (e.g. ``P``). The state machine
-   opens a picker for that letter with the first entry highlighted.
-2. While still holding Alt, tapping the same letter again cycles through
-   the list. Tapping a different letter switches to that letter's list.
-3. When Alt is released, the currently highlighted entry is applied and
-   the picker is hidden. If no picker was open, releasing Alt does
-   nothing — that keeps all the other Alt+X hotkeys unchanged.
+1. User holds the picker modifier key (default ``tab``) and taps a letter
+   key (e.g. ``P``). The state machine opens a picker for that letter
+   with the first entry highlighted.
+2. While still holding the modifier, tapping the same letter again cycles
+   through the list. Tapping a different letter switches to that letter's
+   list.
+3. When the modifier is released, the currently highlighted entry is
+   applied and the picker is hidden. If no picker was open, releasing
+   the modifier does nothing.
 """
 from __future__ import annotations
 
@@ -75,7 +77,7 @@ class OverlayController(QObject):
         if self._visible:
             self.overlay.show()
         self.status.show_message(
-            f"WoT overlay ready  —  {config.HOTKEY_TOGGLE.upper()} to toggle"
+            f"WoT overlay ready  —  tap {config.HOTKEY_TOGGLE.upper()} to toggle"
         )
 
     def _load_overlays(self) -> None:
@@ -101,39 +103,66 @@ class OverlayController(QObject):
     # ==================================================================
 
     def _register_hotkeys(self) -> None:
-        # Collect reserved hotkeys so we don't stomp on them with a letter
-        # hotkey (e.g. "alt+o" would otherwise clash with HOTKEY_TOGGLE).
+        modifier = config.PICKER_MODIFIER.lower()
+
+        # Collect reserved chord strings so a letter hotkey never stomps
+        # on a globally configured action (e.g. if someone sets both
+        # PICKER_MODIFIER = "alt" and HOTKEY_CLEAR = "alt+0", the letter
+        # "0" would collide — "0" isn't a letter, so fine, but this check
+        # catches general collisions too).
         reserved = {
-            config.HOTKEY_TOGGLE.lower(),
             config.HOTKEY_CLEAR.lower(),
             config.HOTKEY_OPACITY_UP.lower(),
             config.HOTKEY_OPACITY_DOWN.lower(),
             config.HOTKEY_QUIT.lower(),
         }
+        if "+" in config.HOTKEY_TOGGLE:
+            reserved.add(config.HOTKEY_TOGGLE.lower())
 
         for letter in self.repo.letters():
-            hk = f"alt+{letter}"
+            hk = f"{modifier}+{letter}"
             if hk in reserved:
                 print(
                     f"[wot-overlay] Skipping letter hotkey {hk!r} — reserved "
                     "for a global action. Either rename the map or change "
-                    "the conflicting HOTKEY_* in config.py."
+                    "the conflicting hotkey in config.json."
                 )
                 continue
             self._safe_register(hk, self._make_letter_cb(letter))
 
-        # Global controls
-        self._safe_register(config.HOTKEY_TOGGLE,       lambda: self._emit("toggle"))
+        # Overlay toggle: tap a single key, or register as a normal chord
+        # if the user configured one.
+        if "+" in config.HOTKEY_TOGGLE:
+            self._safe_register(config.HOTKEY_TOGGLE, lambda: self._emit("toggle"))
+        else:
+            try:
+                self.hotkeys.watch_tap(
+                    config.HOTKEY_TOGGLE,
+                    lambda: self._emit("toggle"),
+                )
+            except Exception as exc:  # noqa: BLE001
+                print(
+                    f"[wot-overlay] Failed to register tap hotkey "
+                    f"{config.HOTKEY_TOGGLE!r}: {exc}"
+                )
+
+        # Other global controls
         self._safe_register(config.HOTKEY_CLEAR,        lambda: self._emit("clear"))
         self._safe_register(config.HOTKEY_OPACITY_UP,   lambda: self._emit("opacity_up"))
         self._safe_register(config.HOTKEY_OPACITY_DOWN, lambda: self._emit("opacity_down"))
         self._safe_register(config.HOTKEY_QUIT,         lambda: self._emit("quit"))
 
-        # Alt-release confirms the picker selection.
+        # Releasing the picker modifier confirms the current selection.
         try:
-            self.hotkeys.register_release("alt", lambda: self._emit("alt_released"))
+            self.hotkeys.register_release(
+                modifier,
+                lambda: self._emit("picker_released"),
+            )
         except Exception as exc:  # noqa: BLE001
-            print(f"[wot-overlay] Failed to register alt-release hook: {exc}")
+            print(
+                f"[wot-overlay] Failed to register release hook for "
+                f"{modifier!r}: {exc}"
+            )
 
     def _safe_register(self, hotkey: str, cb) -> None:
         try:
@@ -158,8 +187,8 @@ class OverlayController(QObject):
         try:
             if action == "letter":
                 self._action_letter(str(payload))
-            elif action == "alt_released":
-                self._action_alt_released()
+            elif action == "picker_released":
+                self._action_picker_released()
             elif action == "toggle":
                 self._action_toggle()
             elif action == "clear":
@@ -180,10 +209,15 @@ class OverlayController(QObject):
         if view is None:
             self.status.show_message(f"No overlays for {letter.upper()}")
             return
-        self.picker.show_picker(view.letter, view.entries, view.selected_index)
+        self.picker.show_picker(
+            config.PICKER_MODIFIER,
+            view.letter,
+            view.entries,
+            view.selected_index,
+        )
 
-    def _action_alt_released(self) -> None:
-        # Fires on every Alt key-up. Only act if a picker was open.
+    def _action_picker_released(self) -> None:
+        # Fires on every picker-modifier key-up. Only act if a picker was open.
         entry: Optional[OverlayEntry] = self.picker_state.release()
         self.picker.hide()
         if entry is None:

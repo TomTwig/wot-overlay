@@ -72,25 +72,37 @@ STATUS_OFFSET_TOP: int = 40
 # Hotkeys
 # ----------------------------------------------------------------------------
 #
-# Syntax follows the `keyboard` library:
+# Hotkey syntax follows the `keyboard` library:
 #   - `+` joins keys that must be pressed together (a chord).
 #   - `,` joins keys that must be pressed in sequence.
 #
 # Selection flow
 # ~~~~~~~~~~~~~~
-# Per-overlay hotkeys are built automatically as ``alt+<letter>`` from the
-# first letter of every map name in OVERLAYS_DIR. Pressing such a chord
-# opens a picker showing all overlays starting with that letter; pressing
-# it again cycles through the list. Releasing Alt applies the currently
-# highlighted entry.
+# The picker uses a hold-modifier workflow. Hold ``PICKER_MODIFIER`` (by
+# default `tab`) and tap the first letter of a map name to open a picker
+# showing all overlays starting with that letter. Tapping the same letter
+# again cycles through the list. Releasing the modifier applies the
+# currently highlighted entry.
 #
-# Because of this, ``alt+<letter>`` is considered reserved for the picker.
-# The global hotkeys below therefore must NOT be bare ``alt+<letter>``
-# combinations — use ``alt+shift+<letter>`` or a non-letter key instead,
-# otherwise the letter picker for that letter becomes unreachable and the
-# app will log a warning and skip it.
+# Per-letter chords ``<PICKER_MODIFIER>+<letter>`` are registered
+# automatically from the files in OVERLAYS_DIR — you never have to list
+# them here.
+#
+# Overlay toggle
+# ~~~~~~~~~~~~~~
+# ``HOTKEY_TOGGLE`` is special: if it contains no ``+``, it is treated as a
+# single key and fires only on a *clean tap* (key pressed and released with
+# no other key pressed in between). That keeps ``alt`` usable as both a
+# toggle **and** a modifier for ``alt+shift+q`` etc. — the toggle only
+# fires if Alt is tapped alone.
+#
+# If HOTKEY_TOGGLE contains ``+`` it's treated as a normal chord, same as
+# the other HOTKEY_* constants.
 
-HOTKEY_TOGGLE: str = "alt+shift+o"   # show / hide the overlay
+# Key to hold while tapping a letter to open the picker.
+PICKER_MODIFIER: str = "tab"
+
+HOTKEY_TOGGLE: str = "alt"           # single key  -> tap to toggle overlay
 HOTKEY_CLEAR: str = "alt+0"          # clear the current image
 HOTKEY_OPACITY_UP: str = "alt+="     # physical `=` / `+` key on main keyboard
 HOTKEY_OPACITY_DOWN: str = "alt+-"
@@ -131,21 +143,43 @@ import json as _json
 
 CONFIG_FILE: Path = _BASE_DIR / "config.json"
 
+
+def _nonempty_str(v: object) -> bool:
+    return isinstance(v, str) and bool(v.strip())
+
+
+def _single_key(v: object) -> bool:
+    # Picker modifier must be a single key name (no chord).
+    return _nonempty_str(v) and "+" not in v  # type: ignore[operator]
+
+
 # JSON key -> (python constant name, allowed type(s), validator)
 _USER_OVERRIDES = {
-    "overlay_size":    ("OVERLAY_SIZE",    int,          lambda v: v > 0),
-    "offset_right":    ("OFFSET_RIGHT",    int,          lambda v: v >= 0),
-    "offset_bottom":   ("OFFSET_BOTTOM",   int,          lambda v: v >= 0),
-    "default_opacity": ("DEFAULT_OPACITY", (int, float), lambda v: 0.0 <= v <= 1.0),
+    "overlay_size":        ("OVERLAY_SIZE",        int,          lambda v: v > 0),
+    "offset_right":        ("OFFSET_RIGHT",        int,          lambda v: v >= 0),
+    "offset_bottom":       ("OFFSET_BOTTOM",       int,          lambda v: v >= 0),
+    "default_opacity":     ("DEFAULT_OPACITY",     (int, float), lambda v: 0.0 <= v <= 1.0),
+    "picker_modifier":     ("PICKER_MODIFIER",     str,          _single_key),
+    "hotkey_toggle":       ("HOTKEY_TOGGLE",       str,          _nonempty_str),
+    "hotkey_clear":        ("HOTKEY_CLEAR",        str,          _nonempty_str),
+    "hotkey_opacity_up":   ("HOTKEY_OPACITY_UP",   str,          _nonempty_str),
+    "hotkey_opacity_down": ("HOTKEY_OPACITY_DOWN", str,          _nonempty_str),
+    "hotkey_quit":         ("HOTKEY_QUIT",         str,          _nonempty_str),
 }
 
 
 def _write_default_config_file() -> None:
     template = {
-        "overlay_size":    OVERLAY_SIZE,
-        "offset_right":    OFFSET_RIGHT,
-        "offset_bottom":   OFFSET_BOTTOM,
-        "default_opacity": DEFAULT_OPACITY,
+        "overlay_size":        OVERLAY_SIZE,
+        "offset_right":        OFFSET_RIGHT,
+        "offset_bottom":       OFFSET_BOTTOM,
+        "default_opacity":     DEFAULT_OPACITY,
+        "picker_modifier":     PICKER_MODIFIER,
+        "hotkey_toggle":       HOTKEY_TOGGLE,
+        "hotkey_clear":        HOTKEY_CLEAR,
+        "hotkey_opacity_up":   HOTKEY_OPACITY_UP,
+        "hotkey_opacity_down": HOTKEY_OPACITY_DOWN,
+        "hotkey_quit":         HOTKEY_QUIT,
     }
     try:
         CONFIG_FILE.write_text(
