@@ -98,6 +98,7 @@ class OverlayController(QObject):
         self._safe_register(config.HOTKEY_CLEAR,        lambda: self._emit("clear"))
         self._safe_register(config.HOTKEY_OPACITY_UP,   lambda: self._emit("opacity_up"))
         self._safe_register(config.HOTKEY_OPACITY_DOWN, lambda: self._emit("opacity_down"))
+        self._safe_register(config.HOTKEY_QUIT,         lambda: self._emit("quit"))
 
     def _safe_register(self, hotkey: str, cb) -> None:
         try:
@@ -132,6 +133,8 @@ class OverlayController(QObject):
                 self._action_opacity(+config.OPACITY_STEP)
             elif action == "opacity_down":
                 self._action_opacity(-config.OPACITY_STEP)
+            elif action == "quit":
+                self._action_quit()
         except Exception:
             # Never let a handler kill the event loop — just log it.
             traceback.print_exc()
@@ -173,6 +176,12 @@ class OverlayController(QObject):
         new_val = max(config.MIN_OPACITY, min(config.MAX_OPACITY, new_val))
         self.overlay.set_opacity(new_val)
         self.status.show_message(f"Opacity: {int(new_val * 100)}%")
+
+    def _action_quit(self) -> None:
+        self.status.show_message("Bye!")
+        # Let the toast render briefly, then cleanly tear down the app.
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(300, self.app.quit)
 
     # ==================================================================
 

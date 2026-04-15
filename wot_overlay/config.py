@@ -84,10 +84,12 @@ STATUS_OFFSET_TOP: int = 40
 # `alt+o` will both fire. Change HOTKEY_TOGGLE to e.g. `alt+shift+o` in that
 # case.
 
-HOTKEY_TOGGLE: str = "alt+o"       # show / hide the overlay
-HOTKEY_CLEAR: str = "alt+0"        # clear the current image
-HOTKEY_OPACITY_UP: str = "alt+="   # physical `=` / `+` key on main keyboard
+HOTKEY_TOGGLE: str = "alt+o"         # show / hide the overlay
+HOTKEY_CLEAR: str = "alt+0"          # clear the current image
+HOTKEY_OPACITY_UP: str = "alt+="     # physical `=` / `+` key on main keyboard
 HOTKEY_OPACITY_DOWN: str = "alt+-"
+HOTKEY_QUIT: str = "alt+shift+q"     # cleanly exit the app (no taskbar icon
+                                     # exists, so this is the only way out)
 
 
 # ----------------------------------------------------------------------------
