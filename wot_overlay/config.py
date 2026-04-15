@@ -99,3 +99,97 @@ HOTKEY_QUIT: str = "alt+shift+q"     # cleanly exit the app (no taskbar icon
 # If True, the overlay window is created but hidden until the user either
 # presses HOTKEY_TOGGLE or selects an image.
 START_HIDDEN: bool = False
+
+
+# ============================================================================
+# Runtime config file (`config.json`) — end users don't rebuild the exe.
+# ============================================================================
+#
+# Any key present in `config.json` overrides the matching default above. The
+# file lives next to the exe (or next to the project root when running from
+# source), so the expected layout for end users is:
+#
+#       wot-overlay\
+#           wot-overlay.exe
+#           config.json          <-- this file
+#           overlays\
+#               paris_1.png
+#               ...
+#
+# On first launch the file is created automatically with the current defaults
+# so users have a template to edit. Unknown keys, wrong types, and values
+# outside the allowed range are logged and ignored — a typo can never prevent
+# the app from starting.
+
+import json as _json
+
+CONFIG_FILE: Path = _BASE_DIR / "config.json"
+
+# JSON key -> (python constant name, allowed type(s), validator)
+_USER_OVERRIDES = {
+    "overlay_size":    ("OVERLAY_SIZE",    int,          lambda v: v > 0),
+    "offset_right":    ("OFFSET_RIGHT",    int,          lambda v: v >= 0),
+    "offset_bottom":   ("OFFSET_BOTTOM",   int,          lambda v: v >= 0),
+    "default_opacity": ("DEFAULT_OPACITY", (int, float), lambda v: 0.0 <= v <= 1.0),
+}
+
+
+def _write_default_config_file() -> None:
+    template = {
+        "overlay_size":    OVERLAY_SIZE,
+        "offset_right":    OFFSET_RIGHT,
+        "offset_bottom":   OFFSET_BOTTOM,
+        "default_opacity": DEFAULT_OPACITY,
+    }
+    try:
+        CONFIG_FILE.write_text(
+            _json.dumps(template, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        print(f"[wot-overlay] Created default config at: {CONFIG_FILE}")
+    except OSError as exc:
+        print(f"[wot-overlay] Could not write {CONFIG_FILE}: {exc}")
+
+
+def _apply_user_config() -> None:
+    if not CONFIG_FILE.exists():
+        _write_default_config_file()
+        return
+
+    try:
+        data = _json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+    except (OSError, _json.JSONDecodeError) as exc:
+        print(f"[wot-overlay] Failed to read {CONFIG_FILE}: {exc}")
+        print("[wot-overlay] Falling back to built-in defaults.")
+        return
+
+    if not isinstance(data, dict):
+        print(
+            f"[wot-overlay] {CONFIG_FILE.name}: top-level value must be a JSON object"
+        )
+        return
+
+    for key, value in data.items():
+        if key not in _USER_OVERRIDES:
+            print(f"[wot-overlay] {CONFIG_FILE.name}: unknown key {key!r} (ignored)")
+            continue
+        const_name, expected_type, validator = _USER_OVERRIDES[key]
+        # Reject bools explicitly — in Python, bool is a subclass of int, and
+        # `true` / `false` in JSON would otherwise sneak through isinstance().
+        if isinstance(value, bool) or not isinstance(value, expected_type):
+            print(
+                f"[wot-overlay] {CONFIG_FILE.name}: {key!r} has wrong type "
+                f"(expected {expected_type}, got {type(value).__name__})"
+            )
+            continue
+        if not validator(value):
+            print(
+                f"[wot-overlay] {CONFIG_FILE.name}: {key!r} value {value!r} "
+                "is out of the allowed range"
+            )
+            continue
+        globals()[const_name] = value
+        print(f"[wot-overlay] config.json override: {key} = {value}")
+
+
+_apply_user_config()

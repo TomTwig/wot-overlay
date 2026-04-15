@@ -6,3 +6,11 @@ venv/
 .env
 .vscode/
 .idea/
+
+# PyInstaller build artefacts
+build/
+dist/
+*.spec
+
+# Runtime config auto-generated on first launch
+config.json
