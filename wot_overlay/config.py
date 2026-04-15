@@ -76,15 +76,21 @@ STATUS_OFFSET_TOP: int = 40
 #   - `+` joins keys that must be pressed together (a chord).
 #   - `,` joins keys that must be pressed in sequence.
 #
-# Per-overlay selection hotkeys are built automatically as
-# `alt+<letter>+<slot>` from the files found in OVERLAYS_DIR.
+# Selection flow
+# ~~~~~~~~~~~~~~
+# Per-overlay hotkeys are built automatically as ``alt+<letter>`` from the
+# first letter of every map name in OVERLAYS_DIR. Pressing such a chord
+# opens a picker showing all overlays starting with that letter; pressing
+# it again cycles through the list. Releasing Alt applies the currently
+# highlighted entry.
 #
-# Note: if you ever add an overlay whose map name starts with the same letter
-# as the toggle hotkey (default `o`), the chord `alt+o+N` and the toggle
-# `alt+o` will both fire. Change HOTKEY_TOGGLE to e.g. `alt+shift+o` in that
-# case.
+# Because of this, ``alt+<letter>`` is considered reserved for the picker.
+# The global hotkeys below therefore must NOT be bare ``alt+<letter>``
+# combinations — use ``alt+shift+<letter>`` or a non-letter key instead,
+# otherwise the letter picker for that letter becomes unreachable and the
+# app will log a warning and skip it.
 
-HOTKEY_TOGGLE: str = "alt+o"         # show / hide the overlay
+HOTKEY_TOGGLE: str = "alt+shift+o"   # show / hide the overlay
 HOTKEY_CLEAR: str = "alt+0"          # clear the current image
 HOTKEY_OPACITY_UP: str = "alt+="     # physical `=` / `+` key on main keyboard
 HOTKEY_OPACITY_DOWN: str = "alt+-"
